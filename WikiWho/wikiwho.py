@@ -593,12 +593,17 @@ class Wikiwho:
                     text_prev.append(word_prev.value)
                     unmatched_words_prev.append(word_prev)
 
+        # Build flat (sentence, token) slots so we can assign words during the
+        # diff pass without re-scanning sentences or the diff list.
+        curr_slots = []  # list of (sentence_curr, word_value)
         text_curr = []
         for sentence_curr in unmatched_sentences_curr:
             # split_into_tokens is already done in analyse_sentences_in_paragraphs
             words = sentence_curr.value.split(' ')
             text_curr.extend(words)
             sentence_curr.splitted.extend(words)
+            for word in words:
+                curr_slots.append((sentence_curr, word))
 
         # Edit consists of removing sentences, not adding new content.
         if not text_curr:
@@ -614,78 +619,51 @@ class Wikiwho:
 
         # Edit consists of adding new content, not changing/removing content
         if not text_prev:
-            for sentence_curr in unmatched_sentences_curr:
-                for word in sentence_curr.splitted:
-                    word_curr = Word()
-                    word_curr.value = word
-                    word_curr.token_id = self.token_id
-                    word_curr.origin_rev_id = self.revision_curr.id
-                    word_curr.last_rev_id = self.revision_curr.id
-
-                    sentence_curr.words.append(word_curr)
-                    self.token_id += 1
-                    self.revision_curr.original_adds += 1
-                    self.tokens.append(word_curr)
+            for sentence_curr, word in curr_slots:
+                word_curr = Word()
+                word_curr.value = word
+                word_curr.token_id = self.token_id
+                word_curr.origin_rev_id = self.revision_curr.id
+                word_curr.last_rev_id = self.revision_curr.id
+                sentence_curr.words.append(word_curr)
+                self.token_id += 1
+                self.revision_curr.original_adds += 1
+                self.tokens.append(word_curr)
             return matched_words_prev, possible_vandalism
 
+        # Single pass diff
+        prev_index = 0
+        curr_index = 0
         d = Differ()
-        diff = list(d.compare(text_prev, text_curr))
-        for sentence_curr in unmatched_sentences_curr:
-            for word in sentence_curr.splitted:
-                curr_matched = False
-                pos = 0
-                diff_len = len(diff)
-                while pos < diff_len:
-                    word_diff = diff[pos]
-                    if word == word_diff[2:]:
-                        if word_diff[0] == ' ':
-                            # match
-                            for word_prev in unmatched_words_prev:
-                                if not word_prev.matched and word_prev.value == word:
-
-                                    word_prev.matched = True
-                                    curr_matched = True
-                                    sentence_curr.words.append(word_prev)
-                                    matched_words_prev.append(word_prev)
-                                    diff[pos] = ''
-                                    pos = diff_len + 1
-                                    break
-                        elif word_diff[0] == '-':
-                            # deleted
-                            for word_prev in unmatched_words_prev:
-                                if not word_prev.matched and word_prev.value == word:
-                                    word_prev.matched = True
-                                    word_prev.outbound.append(self.revision_curr.id)
-                                    matched_words_prev.append(word_prev)
-                                    diff[pos] = ''
-                                    break
-                        elif word_diff[0] == '+':
-                            # a new added word
-                            curr_matched = True
-                            word_curr = Word()
-                            word_curr.value = word
-                            word_curr.token_id = self.token_id
-                            word_curr.origin_rev_id = self.revision_curr.id
-                            word_curr.last_rev_id = self.revision_curr.id
-
-                            sentence_curr.words.append(word_curr)
-                            self.token_id += 1
-                            self.revision_curr.original_adds += 1
-                            self.tokens.append(word_curr)
-                            diff[pos] = ''
-                            pos = diff_len + 1
-                    pos += 1
-
-                if not curr_matched:
-                    word_curr = Word()
-                    word_curr.value = word
-                    word_curr.token_id = self.token_id
-                    word_curr.origin_rev_id = self.revision_curr.id
-                    word_curr.last_rev_id = self.revision_curr.id
-                    sentence_curr.words.append(word_curr)
-
-                    self.token_id += 1
-                    self.revision_curr.original_adds += 1
-                    self.tokens.append(word_curr)
+        for diff_item in d.compare(text_prev, text_curr):
+            op = diff_item[0]
+            if op == '?': # Differ hint line; skip
+                continue
+            elif op == ' ': # next prev word is matched to next curr slot
+                word_prev = unmatched_words_prev[prev_index]
+                sentence_curr, _ = curr_slots[curr_index]
+                word_prev.matched = True
+                sentence_curr.words.append(word_prev)
+                matched_words_prev.append(word_prev)
+                prev_index += 1
+                curr_index += 1
+            elif op == '-': # next prev word is deleted (not present in curr)
+                word_prev = unmatched_words_prev[prev_index]
+                word_prev.matched = True
+                word_prev.outbound.append(self.revision_curr.id)
+                matched_words_prev.append(word_prev)
+                prev_index += 1
+            elif op == '+': # next curr slot gets a brand-new Word
+                sentence_curr, word = curr_slots[curr_index]
+                word_curr = Word()
+                word_curr.value = word
+                word_curr.token_id = self.token_id
+                word_curr.origin_rev_id = self.revision_curr.id
+                word_curr.last_rev_id = self.revision_curr.id
+                sentence_curr.words.append(word_curr)
+                self.token_id += 1
+                self.revision_curr.original_adds += 1
+                self.tokens.append(word_curr)
+                curr_index += 1
 
         return matched_words_prev, possible_vandalism
