@@ -16,6 +16,11 @@ import re
 regex_dot = re.compile(r"([^\s\.=][^\s\.=][^\s\.=]\.) ")
 regex_url = re.compile(r"(http.*?://.*?[ \|<>\n\r])")
 # regex_url = re.compile(r"(http[s]?://.*?[ \|<>\n\r])")
+regex_cjk = re.compile(
+    '([\u2E80-\u9FFF\uF900-\uFAFF\uFE00-\uFE1F\uFE30-\uFE6F'
+    '\uFF00-\uFFEF\U00016FE0-\U0001B2FF\U0001F000-\U0001F2FF'
+    '\U00020000-\U0003347F\U000E0100-\U000E01EF])'
+)
 
 
 def calculate_hash(text):
@@ -91,6 +96,8 @@ def split_into_tokens(text):
     # text = text.replace('-||||-', '--')
     # text = text.replace('<||||!||||--||', '||<!--||').replace('||--||||>', '||-->||')
     text = text.replace('<||||!||||-||||-||', '||<!--||').replace('||-||||-||||>', '||-->||')
+    if not text.isascii() and regex_cjk.search(text):
+        text = regex_cjk.sub(r'||\1||', text)
 
     while '||||' in text:
         text = text.replace('||||', '||')
