@@ -21,6 +21,15 @@ regex_cjk = re.compile(
     '\uFF00-\uFFEF\U00016FE0-\U0001B2FF\U0001F000-\U0001F2FF'
     '\U00020000-\U0003347F\U000E0100-\U000E01EF])'
 )
+TOKEN_SYMBOLS = (
+    '.', ',', ';', ':', '?', '!', '-', '_', '/', '\\', '(', ')', '[', ']', '{', '}', '*', '#', '@',
+    '&', '=', '+', '%', '~', '$', '^', '<', '>', '"', '\'', '´', '`', '¸', '˛', '’',
+    '¤', '₳', '฿', '₵', '¢', '₡', '₢', '₫', '₯', '֏', '₠', '€', 'ƒ', '₣', '₲', '₴', '₭', '₺',
+    '₾', 'ℳ', '₥', '₦', '₧', '₱', '₰', '£', '៛', '₽', '₹', '₨', '₪', '৳', '₸', '₮', '₩', '¥',
+    '§', '‖', '¦', '⟨', '⟩', '–', '—', '¯', '»', '«', '”', '÷', '×', '′', '″', '‴', '¡',
+    '¿', '©', '℗', '®', '℠', '™'
+)
+TOKEN_SYMBOL_REPLACEMENTS = tuple((c, '||{}||'.format(c)) for c in TOKEN_SYMBOLS)
 
 
 def calculate_hash(text):
@@ -77,16 +86,10 @@ def split_into_tokens(text):
 
     text = text.replace('\n', '||').replace(' ', '||')
 
-    symbols = ['.', ',', ';', ':', '?', '!', '-', '_', '/', '\\', '(', ')', '[', ']', '{', '}', '*', '#', '@',
-               '&', '=', '+', '%', '~', '$', '^', '<', '>', '"', '\'', '´', '`', '¸', '˛', '’',
-               '¤', '₳', '฿', '₵', '¢', '₡', '₢', '₫', '₯', '֏', '₠', '€', 'ƒ', '₣', '₲', '₴', '₭', '₺',
-               '₾', 'ℳ', '₥', '₦', '₧', '₱', '₰', '£', '៛', '₽', '₹', '₨', '₪', '৳', '₸', '₮', '₩', '¥',
-               '§', '‖', '¦', '⟨', '⟩', '–', '—', '¯', '»', '«', '”', '÷', '×', '′', '″', '‴', '¡',
-               '¿', '©', '℗', '®', '℠', '™']
     # currency_symbols_long = '¢,£,¤,¥,֏,؋,৲,৳,৻,૱,௹,฿,៛,₠,₡,₢,₣,₤,₥,₦,₧,₨,₩,₪,₫,€,₭,₮,₯,₰,₱,₲,₳,₴,₵' \
     #                    ',₶,₷,₸,₹,₺,꠸,﷼,﹩,＄,￠,￡,￥,￦'.split(',')
-    for c in symbols:
-        text = text.replace(c, '||{}||'.format(c))
+    for symbol, replacement in TOKEN_SYMBOL_REPLACEMENTS:
+        text = text.replace(symbol, replacement)
 
     # re-construct some special character groups as they are tokens
     text = text.replace('[||||[', '[[').replace(']||||]', ']]')
@@ -102,8 +105,7 @@ def split_into_tokens(text):
     while '||||' in text:
         text = text.replace('||||', '||')
 
-    tokens = filter(lambda a: a != '', text.split('||'))  # filter empty strings
-    tokens = ['|' if w == 'ææææ' else w for w in tokens]  # insert back the |s
+    tokens = ['|' if w == 'ææææ' else w for w in text.split('||') if w != '']  # insert back the |s
     return tokens
 
 
