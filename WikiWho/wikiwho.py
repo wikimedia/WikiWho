@@ -51,6 +51,14 @@ class Wikiwho:
         self.text_curr = ''
         self.temp = []
 
+        # Keep the public list shape while using a set for membership checks.
+        self.spam_hashes_set = set()
+
+    def _add_spam_revision(self, rev_id, rev_hash):
+        self.spam_ids.append(rev_id)
+        self.spam_hashes.append(rev_hash)
+        self.spam_hashes_set.add(rev_hash)
+
     def clean_attributes(self):
         """
         Empty attributes that are usually not needed after analyzing an article.
@@ -77,7 +85,7 @@ class Wikiwho:
 
             rev_id = revision.id
             rev_hash = revision.sha1 or calculate_hash(text)
-            if rev_hash in self.spam_hashes:
+            if rev_hash in self.spam_hashes_set:
                 vandalism = True
 
             # TODO: spam detection: DELETION
@@ -94,8 +102,7 @@ class Wikiwho:
             if vandalism:
                 # print("---------------------------- FLAG 1")
                 self.revision_curr = self.revision_prev
-                self.spam_ids.append(rev_id)
-                self.spam_hashes.append(rev_hash)
+                self._add_spam_revision(rev_id, rev_hash)
             else:
                 # Information about the current revision.
                 self.revision_curr = Revision()
@@ -128,8 +135,7 @@ class Wikiwho:
                 if vandalism:
                     # print "---------------------------- FLAG 2"
                     self.revision_curr = self.revision_prev  # skip revision with vandalism in history
-                    self.spam_ids.append(rev_id)
-                    self.spam_hashes.append(rev_hash)
+                    self._add_spam_revision(rev_id, rev_hash)
                 else:
                     # Add the current revision with all the information.
                     self.revisions.update({self.revision_curr.id: self.revision_curr})
@@ -152,8 +158,10 @@ class Wikiwho:
 
             text = revision.get('*', '')
             rev_id = int(revision['revid'])
-            rev_hash = revision.get('sha1', calculate_hash(text))
-            if rev_hash in self.spam_hashes:
+            rev_hash = revision.get('sha1')
+            if not rev_hash:
+                rev_hash = calculate_hash(text)
+            if rev_hash in self.spam_hashes_set:
                 vandalism = True
 
             # TODO: spam detection: DELETION
@@ -170,8 +178,7 @@ class Wikiwho:
             if vandalism:
                 # print("---------------------------- FLAG 1")
                 self.revision_curr = self.revision_prev
-                self.spam_ids.append(rev_id)
-                self.spam_hashes.append(rev_hash)
+                self._add_spam_revision(rev_id, rev_hash)
             else:
                 # Information about the current revision.
                 self.revision_curr = Revision()
@@ -196,8 +203,7 @@ class Wikiwho:
                 if vandalism:
                     # print "---------------------------- FLAG 2"
                     self.revision_curr = self.revision_prev  # skip revision with vandalism in history
-                    self.spam_ids.append(rev_id)
-                    self.spam_hashes.append(rev_hash)
+                    self._add_spam_revision(rev_id, rev_hash)
                 else:
                     # Add the current revision with all the information.
                     self.revisions.update({self.revision_curr.id: self.revision_curr})
@@ -445,11 +451,11 @@ class Wikiwho:
                 unmatched_paragraphs_curr.append(paragraph_curr)
 
         # Identify unmatched paragraphs in previous revision for further analysis.
+        paragraph_duplicate_counts = {}
         for paragraph_prev_hash in self.revision_prev.ordered_paragraphs:
             if len(self.revision_prev.paragraphs[paragraph_prev_hash]) > 1:
-                s = 'p-{}-{}'.format(self.revision_prev, paragraph_prev_hash)
-                self.temp.append(s)
-                count = self.temp.count(s)
+                count = paragraph_duplicate_counts.get(paragraph_prev_hash, 0) + 1
+                paragraph_duplicate_counts[paragraph_prev_hash] = count
                 paragraph_prev = self.revision_prev.paragraphs[paragraph_prev_hash][count - 1]
             else:
                 paragraph_prev = self.revision_prev.paragraphs[paragraph_prev_hash][0]
@@ -564,12 +570,13 @@ class Wikiwho:
                     unmatched_sentences_curr.append(sentence_curr)
 
         # Identify the unmatched sentences in the previous paragraph revision.
+        sentence_duplicate_counts = {}
         for paragraph_prev in unmatched_paragraphs_prev:
             for sentence_prev_hash in paragraph_prev.ordered_sentences:
                 if len(paragraph_prev.sentences[sentence_prev_hash]) > 1:
-                    s = 's-{}-{}'.format(paragraph_prev, sentence_prev_hash)
-                    self.temp.append(s)
-                    count = self.temp.count(s)
+                    key = (id(paragraph_prev), sentence_prev_hash)
+                    count = sentence_duplicate_counts.get(key, 0) + 1
+                    sentence_duplicate_counts[key] = count
                     sentence_prev = paragraph_prev.sentences[sentence_prev_hash][count - 1]
                 else:
                     sentence_prev = paragraph_prev.sentences[sentence_prev_hash][0]
