@@ -12,7 +12,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from difflib import Differ
+from difflib import SequenceMatcher
 
 from .structures import Word, Sentence, Paragraph, Revision
 from .utils import calculate_hash, split_into_paragraphs, split_into_sentences, split_into_tokens, \
@@ -639,38 +639,32 @@ class Wikiwho:
             return matched_words_prev, possible_vandalism
 
         # Single pass diff
-        prev_index = 0
-        curr_index = 0
-        d = Differ()
-        for diff_item in d.compare(text_prev, text_curr):
-            op = diff_item[0]
-            if op == '?': # Differ hint line; skip
-                continue
-            elif op == ' ': # next prev word is matched to next curr slot
-                word_prev = unmatched_words_prev[prev_index]
-                sentence_curr, _ = curr_slots[curr_index]
-                word_prev.matched = True
-                sentence_curr.words.append(word_prev)
-                matched_words_prev.append(word_prev)
-                prev_index += 1
-                curr_index += 1
-            elif op == '-': # next prev word is deleted (not present in curr)
-                word_prev = unmatched_words_prev[prev_index]
-                word_prev.matched = True
-                word_prev.outbound.append(self.revision_curr.id)
-                matched_words_prev.append(word_prev)
-                prev_index += 1
-            elif op == '+': # next curr slot gets a brand-new Word
-                sentence_curr, word = curr_slots[curr_index]
-                word_curr = Word()
-                word_curr.value = word
-                word_curr.token_id = self.token_id
-                word_curr.origin_rev_id = self.revision_curr.id
-                word_curr.last_rev_id = self.revision_curr.id
-                sentence_curr.words.append(word_curr)
-                self.token_id += 1
-                self.revision_curr.original_adds += 1
-                self.tokens.append(word_curr)
-                curr_index += 1
+        matcher = SequenceMatcher(None, text_prev, text_curr, autojunk=False)
+        for tag, prev_start, prev_end, curr_start, curr_end in matcher.get_opcodes():
+            if tag == 'equal':
+                for prev_index, curr_index in zip(range(prev_start, prev_end), range(curr_start, curr_end)):
+                    word_prev = unmatched_words_prev[prev_index]
+                    sentence_curr, _ = curr_slots[curr_index]
+                    word_prev.matched = True
+                    sentence_curr.words.append(word_prev)
+                    matched_words_prev.append(word_prev)
+            if tag in ('delete', 'replace'):
+                for prev_index in range(prev_start, prev_end):
+                    word_prev = unmatched_words_prev[prev_index]
+                    word_prev.matched = True
+                    word_prev.outbound.append(self.revision_curr.id)
+                    matched_words_prev.append(word_prev)
+            if tag in ('insert', 'replace'):
+                for curr_index in range(curr_start, curr_end):
+                    sentence_curr, word = curr_slots[curr_index]
+                    word_curr = Word()
+                    word_curr.value = word
+                    word_curr.token_id = self.token_id
+                    word_curr.origin_rev_id = self.revision_curr.id
+                    word_curr.last_rev_id = self.revision_curr.id
+                    sentence_curr.words.append(word_curr)
+                    self.token_id += 1
+                    self.revision_curr.original_adds += 1
+                    self.tokens.append(word_curr)
 
         return matched_words_prev, possible_vandalism
