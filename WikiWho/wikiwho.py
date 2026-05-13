@@ -12,6 +12,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from bisect import bisect_left
+from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 
 from .structures import Word, Sentence, Paragraph, Revision
@@ -27,6 +29,138 @@ FLAG = "move"
 UNMATCHED_PARAGRAPH = 0.0
 TOKEN_DENSITY_LIMIT = 20
 TOKEN_LEN = 100
+WORD_MATCH_MAX_SEQUENCE_PAIRS = 200000
+WORD_MATCH_MAX_LOCAL_PAIRS = 10000
+WORD_MATCH_MAX_DRIFT_MIN = 50
+WORD_MATCH_MAX_DRIFT_RATIO = 0.10
+
+
+def _common_prefix_len(left, right):
+    limit = min(len(left), len(right))
+    index = 0
+    while index < limit and left[index] == right[index]:
+        index += 1
+    return index
+
+
+def _common_suffix_len(left, right, prefix_len):
+    limit = min(len(left), len(right)) - prefix_len
+    suffix_len = 0
+    while suffix_len < limit and left[len(left) - suffix_len - 1] == right[len(right) - suffix_len - 1]:
+        suffix_len += 1
+    return suffix_len
+
+
+def _word_match_drift_limit(prev_len, curr_len):
+    return max(WORD_MATCH_MAX_DRIFT_MIN,
+               int(WORD_MATCH_MAX_DRIFT_RATIO * max(prev_len, curr_len)))
+
+
+def _word_match_pair_estimate(prev_tokens, curr_tokens):
+    prev_counts = Counter(prev_tokens)
+    curr_counts = Counter(curr_tokens)
+    total = 0
+    for token, prev_count in prev_counts.items():
+        total += prev_count * curr_counts.get(token, 0)
+    return total
+
+
+def _nearest_word_matches(prev_tokens, curr_tokens, prev_offset, curr_offset, max_drift):
+    positions_by_token = defaultdict(list)
+    for prev_index, token in enumerate(prev_tokens):
+        positions_by_token[token].append(prev_index)
+
+    curr_to_prev = {}
+    used_prev = set()
+    for curr_index, token in enumerate(curr_tokens):
+        positions = positions_by_token.get(token)
+        if not positions:
+            continue
+
+        expected_prev_index = curr_offset + curr_index - prev_offset
+        right = bisect_left(positions, expected_prev_index)
+        left = right - 1
+        best_prev = None
+        best_distance = None
+
+        while left >= 0 or right < len(positions):
+            checked_side = False
+            if left >= 0:
+                prev_index = positions[left]
+                distance = abs((prev_offset + prev_index) - (curr_offset + curr_index))
+                if distance <= max_drift:
+                    checked_side = True
+                    if prev_index not in used_prev and (best_distance is None or distance < best_distance):
+                        best_prev = prev_index
+                        best_distance = distance
+                else:
+                    left = -1
+                left -= 1
+            if right < len(positions):
+                prev_index = positions[right]
+                distance = abs((prev_offset + prev_index) - (curr_offset + curr_index))
+                if distance <= max_drift:
+                    checked_side = True
+                    if prev_index not in used_prev and (best_distance is None or distance < best_distance):
+                        best_prev = prev_index
+                        best_distance = distance
+                else:
+                    right = len(positions)
+                right += 1
+            if best_prev is not None or not checked_side:
+                break
+
+        if best_prev is not None:
+            curr_to_prev[curr_index] = best_prev
+            used_prev.add(best_prev)
+    return curr_to_prev
+
+
+def _match_word_sequences(text_prev, text_curr):
+    prev_for_curr = [None] * len(text_curr)
+
+    prefix_len = _common_prefix_len(text_prev, text_curr)
+    suffix_len = _common_suffix_len(text_prev, text_curr, prefix_len)
+    for index in range(prefix_len):
+        prev_for_curr[index] = index
+    for index in range(suffix_len):
+        prev_index = len(text_prev) - suffix_len + index
+        curr_index = len(text_curr) - suffix_len + index
+        prev_for_curr[curr_index] = prev_index
+
+    prev_mid_start = prefix_len
+    prev_mid_end = len(text_prev) - suffix_len
+    curr_mid_start = prefix_len
+    curr_mid_end = len(text_curr) - suffix_len
+    prev_mid = text_prev[prev_mid_start:prev_mid_end]
+    curr_mid = text_curr[curr_mid_start:curr_mid_end]
+
+    if prev_mid and curr_mid:
+        max_drift = _word_match_drift_limit(len(prev_mid), len(curr_mid))
+        if _word_match_pair_estimate(prev_mid, curr_mid) <= WORD_MATCH_MAX_SEQUENCE_PAIRS:
+            matcher = SequenceMatcher(None, prev_mid, curr_mid, autojunk=False)
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                if tag == 'equal' and abs((prev_mid_start + i1) - (curr_mid_start + j1)) <= max_drift:
+                    for prev_index, curr_index in zip(range(i1, i2), range(j1, j2)):
+                        prev_for_curr[curr_mid_start + curr_index] = prev_mid_start + prev_index
+                elif tag in ('replace', 'equal') and (i2 - i1) * (j2 - j1) <= WORD_MATCH_MAX_LOCAL_PAIRS:
+                    local_matches = _nearest_word_matches(prev_mid[i1:i2],
+                                                          curr_mid[j1:j2],
+                                                          prev_mid_start + i1,
+                                                          curr_mid_start + j1,
+                                                          max_drift)
+                    for curr_index, prev_index in local_matches.items():
+                        prev_for_curr[curr_mid_start + j1 + curr_index] = prev_mid_start + i1 + prev_index
+        else:
+            local_matches = _nearest_word_matches(prev_mid, curr_mid,
+                                                  prev_mid_start, curr_mid_start,
+                                                  max_drift)
+            for curr_index, prev_index in local_matches.items():
+                prev_for_curr[curr_mid_start + curr_index] = prev_mid_start + prev_index
+
+    matched_prev = set(prev_index for prev_index in prev_for_curr if prev_index is not None)
+    deleted_prev = [index for index in range(len(text_prev)) if index not in matched_prev]
+    return prev_for_curr, deleted_prev
 
 
 class Wikiwho:
@@ -638,33 +772,29 @@ class Wikiwho:
                 self.tokens.append(word_curr)
             return matched_words_prev, possible_vandalism
 
-        # Single pass diff
-        matcher = SequenceMatcher(None, text_prev, text_curr, autojunk=False)
-        for tag, prev_start, prev_end, curr_start, curr_end in matcher.get_opcodes():
-            if tag == 'equal':
-                for prev_index, curr_index in zip(range(prev_start, prev_end), range(curr_start, curr_end)):
-                    word_prev = unmatched_words_prev[prev_index]
-                    sentence_curr, _ = curr_slots[curr_index]
-                    word_prev.matched = True
-                    sentence_curr.words.append(word_prev)
-                    matched_words_prev.append(word_prev)
-            if tag in ('delete', 'replace'):
-                for prev_index in range(prev_start, prev_end):
-                    word_prev = unmatched_words_prev[prev_index]
-                    word_prev.matched = True
-                    word_prev.outbound.append(self.revision_curr.id)
-                    matched_words_prev.append(word_prev)
-            if tag in ('insert', 'replace'):
-                for curr_index in range(curr_start, curr_end):
-                    sentence_curr, word = curr_slots[curr_index]
-                    word_curr = Word()
-                    word_curr.value = word
-                    word_curr.token_id = self.token_id
-                    word_curr.origin_rev_id = self.revision_curr.id
-                    word_curr.last_rev_id = self.revision_curr.id
-                    sentence_curr.words.append(word_curr)
-                    self.token_id += 1
-                    self.revision_curr.original_adds += 1
-                    self.tokens.append(word_curr)
+        prev_for_curr, deleted_prev_indices = _match_word_sequences(text_prev, text_curr)
+        for curr_index, prev_index in enumerate(prev_for_curr):
+            sentence_curr, word = curr_slots[curr_index]
+            if prev_index is None:
+                word_curr = Word()
+                word_curr.value = word
+                word_curr.token_id = self.token_id
+                word_curr.origin_rev_id = self.revision_curr.id
+                word_curr.last_rev_id = self.revision_curr.id
+                sentence_curr.words.append(word_curr)
+                self.token_id += 1
+                self.revision_curr.original_adds += 1
+                self.tokens.append(word_curr)
+            else:
+                word_prev = unmatched_words_prev[prev_index]
+                word_prev.matched = True
+                sentence_curr.words.append(word_prev)
+                matched_words_prev.append(word_prev)
+
+        for prev_index in deleted_prev_indices:
+            word_prev = unmatched_words_prev[prev_index]
+            word_prev.matched = True
+            word_prev.outbound.append(self.revision_curr.id)
+            matched_words_prev.append(word_prev)
 
         return matched_words_prev, possible_vandalism
