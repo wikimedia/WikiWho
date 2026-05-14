@@ -90,33 +90,33 @@ def _nearest_word_matches(prev_tokens, curr_tokens, prev_offset, curr_offset, ma
         left = right - 1
         best_prev = None
         best_distance = None
+        curr_abs_index = curr_offset + curr_index
 
         while left >= 0 or right < len(positions):
-            checked_side = False
             if left >= 0:
                 prev_index = positions[left]
-                distance = abs((prev_offset + prev_index) - (curr_offset + curr_index))
-                if distance <= max_drift:
-                    checked_side = True
-                    if prev_index not in used_prev and (best_distance is None or distance < best_distance):
+                distance = abs((prev_offset + prev_index) - curr_abs_index)
+                if distance > max_drift or (best_distance is not None and distance > best_distance):
+                    left = -1
+                else:
+                    if prev_index not in used_prev and (
+                            best_distance is None or distance < best_distance or
+                            (distance == best_distance and prev_index < best_prev)):
                         best_prev = prev_index
                         best_distance = distance
-                else:
-                    left = -1
-                left -= 1
+                    left -= 1
             if right < len(positions):
                 prev_index = positions[right]
-                distance = abs((prev_offset + prev_index) - (curr_offset + curr_index))
-                if distance <= max_drift:
-                    checked_side = True
-                    if prev_index not in used_prev and (best_distance is None or distance < best_distance):
+                distance = abs((prev_offset + prev_index) - curr_abs_index)
+                if distance > max_drift or (best_distance is not None and distance > best_distance):
+                    right = len(positions)
+                else:
+                    if prev_index not in used_prev and (
+                            best_distance is None or distance < best_distance or
+                            (distance == best_distance and prev_index < best_prev)):
                         best_prev = prev_index
                         best_distance = distance
-                else:
-                    right = len(positions)
-                right += 1
-            if best_prev is not None or not checked_side:
-                break
+                    right += 1
 
         if best_prev is not None:
             curr_to_prev[curr_index] = best_prev
