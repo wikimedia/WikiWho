@@ -33,13 +33,13 @@ TOKEN_LEN = 100
 # Caps estimated identical-token prev/current pairs for the SequenceMatcher opcode pass. Above this, the whole unmatched middle span falls back to bounded nearest-neighbor matching.
 WORD_MATCH_MAX_SEQUENCE_PAIRS = 200000
 
-# Caps nearest-neighbor recovery inside one SequenceMatcher replace/equal  opcode region. Higher values preserve more matches in broad edits but can  reintroduce expensive local scans.
+# Caps nearest-neighbor recovery inside one SequenceMatcher replace opcode region. Higher values preserve more matches in broad edits but can reintroduce expensive local scans.
 WORD_MATCH_MAX_LOCAL_PAIRS = 10000
 
-# Minimum positional drift allowed when deciding whether to reuse a previous Word object.
+# Minimum positional drift allowed for nearest-neighbor reuse of a previous Word object.
 WORD_MATCH_MAX_DRIFT_MIN = 50
 
-# Ratio-based positional drift allowed, computed against the larger unmatched side. Higher drift preserves longer moves; lower drift bounds cost and cross-section matches but loses lineage for content moved farther away.
+# Ratio-based nearest-neighbor drift allowed, computed against the larger unmatched side. Higher drift preserves more heuristic matches; lower drift bounds cost and cross-section matches.
 WORD_MATCH_MAX_DRIFT_RATIO = 0.10
 
 
@@ -148,10 +148,10 @@ def _match_word_sequences(text_prev, text_curr):
         if _word_match_pair_estimate(prev_mid, curr_mid) <= WORD_MATCH_MAX_SEQUENCE_PAIRS:
             matcher = SequenceMatcher(None, prev_mid, curr_mid, autojunk=False)
             for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-                if tag == 'equal' and abs((prev_mid_start + i1) - (curr_mid_start + j1)) <= max_drift:
+                if tag == 'equal':
                     for prev_index, curr_index in zip(range(i1, i2), range(j1, j2)):
                         prev_for_curr[curr_mid_start + curr_index] = prev_mid_start + prev_index
-                elif tag in ('replace', 'equal') and (i2 - i1) * (j2 - j1) <= WORD_MATCH_MAX_LOCAL_PAIRS:
+                elif tag == 'replace' and (i2 - i1) * (j2 - j1) <= WORD_MATCH_MAX_LOCAL_PAIRS:
                     local_matches = _nearest_word_matches(prev_mid[i1:i2],
                                                           curr_mid[j1:j2],
                                                           prev_mid_start + i1,
