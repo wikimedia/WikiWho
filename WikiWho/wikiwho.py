@@ -29,9 +29,17 @@ FLAG = "move"
 UNMATCHED_PARAGRAPH = 0.0
 TOKEN_DENSITY_LIMIT = 20
 TOKEN_LEN = 100
+
+# Caps estimated identical-token prev/current pairs for the SequenceMatcher opcode pass. Above this, the whole unmatched middle span falls back to bounded nearest-neighbor matching.
 WORD_MATCH_MAX_SEQUENCE_PAIRS = 200000
+
+# Caps nearest-neighbor recovery inside one SequenceMatcher replace/equal  opcode region. Higher values preserve more matches in broad edits but can  reintroduce expensive local scans.
 WORD_MATCH_MAX_LOCAL_PAIRS = 10000
+
+# Minimum positional drift allowed when deciding whether to reuse a previous Word object.
 WORD_MATCH_MAX_DRIFT_MIN = 50
+
+# Ratio-based positional drift allowed, computed against the larger unmatched side. Higher drift preserves longer moves; lower drift bounds cost and cross-section matches but loses lineage for content moved farther away.
 WORD_MATCH_MAX_DRIFT_RATIO = 0.10
 
 
@@ -170,6 +178,9 @@ class Wikiwho:
         self.sentences_ht = {}
 
         self.spam_ids = []
+        # Mutable public list kept for compatibility. Changes to spam_hashes
+        # must go through _add_spam_revision() exclusively so spam_hashes_set
+        # stays in sync for membership checks.
         self.spam_hashes = []
         self.tokens = []  # [word_obj, ..] ordered, unique list of tokens of this article
         self.revisions = {}  # {rev_id : rev_obj, ...}
@@ -189,6 +200,7 @@ class Wikiwho:
         self.spam_hashes_set = set()
 
     def _add_spam_revision(self, rev_id, rev_hash):
+        """Record a spam revision while keeping the public list and set synced."""
         self.spam_ids.append(rev_id)
         self.spam_hashes.append(rev_hash)
         self.spam_hashes_set.add(rev_hash)
