@@ -42,6 +42,15 @@ WORD_MATCH_MAX_DRIFT_MIN = 50
 # Ratio-based nearest-neighbor drift allowed, computed against the larger unmatched side. Higher drift preserves more heuristic matches; lower drift bounds cost and cross-section matches.
 WORD_MATCH_MAX_DRIFT_RATIO = 0.10
 
+# Wikitext constructs whose boundary tokens are too generic to claim through a cheap common-prefix/common-suffix match. If an edge match stops inside one of these constructs, the edge is rolled back so contextual matching sees the whole template/link/comment.
+WIKITEXT_CONSTRUCT_PAIRS = (
+    ('{{', '}}'),
+    ('[[', ']]'),
+    ('<!--', '-->'),
+)
+WIKITEXT_OPEN_TO_CLOSE = dict(WIKITEXT_CONSTRUCT_PAIRS)
+WIKITEXT_CLOSE_TO_OPEN = dict((close, open_) for open_, close in WIKITEXT_CONSTRUCT_PAIRS)
+
 
 def _common_prefix_len(left, right):
     limit = min(len(left), len(right))
@@ -57,6 +66,75 @@ def _common_suffix_len(left, right, prefix_len):
     while suffix_len < limit and left[len(left) - suffix_len - 1] == right[len(right) - suffix_len - 1]:
         suffix_len += 1
     return suffix_len
+
+
+def _construct_stack_at(tokens, end):
+    stack = []
+    for index in range(end):
+        token = tokens[index]
+        if token in WIKITEXT_OPEN_TO_CLOSE:
+            stack.append((token, index))
+        elif token in WIKITEXT_CLOSE_TO_OPEN:
+            open_token = WIKITEXT_CLOSE_TO_OPEN[token]
+            for stack_index in range(len(stack) - 1, -1, -1):
+                if stack[stack_index][0] == open_token:
+                    del stack[stack_index:]
+                    break
+    return stack
+
+
+def _construct_end_after_boundary(tokens, start, open_token):
+    close_token = WIKITEXT_OPEN_TO_CLOSE[open_token]
+    depth = 1
+    for index in range(start, len(tokens)):
+        token = tokens[index]
+        if token == open_token:
+            depth += 1
+        elif token == close_token:
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return None
+
+
+def _rollback_prefix_construct_boundary(tokens, prefix_len):
+    rollback = prefix_len
+    while rollback:
+        stack = _construct_stack_at(tokens, rollback)
+        if not stack:
+            return rollback
+        open_token, open_index = stack[-1]
+        if _construct_end_after_boundary(tokens, rollback, open_token) is None:
+            return rollback
+        rollback = open_index
+    return rollback
+
+
+def _suffix_construct_boundary_drop(tokens, suffix_start):
+    drop = 0
+    while suffix_start + drop < len(tokens):
+        boundary = suffix_start + drop
+        stack = _construct_stack_at(tokens, boundary)
+        if not stack:
+            return drop
+        open_token, _ = stack[-1]
+        construct_end = _construct_end_after_boundary(tokens, boundary, open_token)
+        if construct_end is None:
+            return drop
+        drop = construct_end - suffix_start
+    return drop
+
+
+def _rollback_common_construct_edges(left, right, prefix_len):
+    # Do not let cheap edge matches claim generic tokens from inside templates, links, or comments before the contextual matcher sees the whole construct.
+    prefix_len = min(_rollback_prefix_construct_boundary(left, prefix_len),
+                     _rollback_prefix_construct_boundary(right, prefix_len))
+    suffix_len = _common_suffix_len(left, right, prefix_len)
+    if suffix_len:
+        left_drop = _suffix_construct_boundary_drop(left, len(left) - suffix_len)
+        right_drop = _suffix_construct_boundary_drop(right, len(right) - suffix_len)
+        suffix_len -= min(suffix_len, max(left_drop, right_drop))
+    return prefix_len, suffix_len
 
 
 def _word_match_drift_limit(prev_len, curr_len):
@@ -128,7 +206,7 @@ def _match_word_sequences(text_prev, text_curr):
     prev_for_curr = [None] * len(text_curr)
 
     prefix_len = _common_prefix_len(text_prev, text_curr)
-    suffix_len = _common_suffix_len(text_prev, text_curr, prefix_len)
+    prefix_len, suffix_len = _rollback_common_construct_edges(text_prev, text_curr, prefix_len)
     for index in range(prefix_len):
         prev_for_curr[index] = index
     for index in range(suffix_len):
