@@ -125,16 +125,119 @@ def _suffix_construct_boundary_drop(tokens, suffix_start):
     return drop
 
 
-def _rollback_common_construct_edges(left, right, prefix_len):
+def _rollback_common_construct_edges(left, right, left_keys, right_keys, prefix_len):
     # Do not let cheap edge matches claim generic tokens from inside templates, links, or comments before the contextual matcher sees the whole construct.
     prefix_len = min(_rollback_prefix_construct_boundary(left, prefix_len),
                      _rollback_prefix_construct_boundary(right, prefix_len))
-    suffix_len = _common_suffix_len(left, right, prefix_len)
+    suffix_len = _common_suffix_len(left_keys, right_keys, prefix_len)
     if suffix_len:
         left_drop = _suffix_construct_boundary_drop(left, len(left) - suffix_len)
         right_drop = _suffix_construct_boundary_drop(right, len(right) - suffix_len)
         suffix_len -= min(suffix_len, max(left_drop, right_drop))
     return prefix_len, suffix_len
+
+
+def _tokens_until(tokens, start, stops):
+    collected = []
+    index = start
+    while index < len(tokens) and tokens[index] not in stops:
+        collected.append(tokens[index])
+        index += 1
+    return tuple(collected), index
+
+
+def _template_name_after(tokens, start):
+    name, _ = _tokens_until(tokens, start, ('|', '}}'))
+    return name
+
+
+def _link_target_after(tokens, start):
+    target, _ = _tokens_until(tokens, start, ('|', ']]'))
+    return target
+
+
+def _template_field_after(tokens, start):
+    field, index = _tokens_until(tokens, start, ('=', '|', '}}'))
+    if index < len(tokens) and tokens[index] == '=' and field:
+        return field
+    return None
+
+
+def _template_field_before(tokens, equals_index):
+    field = []
+    index = equals_index - 1
+    while index >= 0 and tokens[index] not in ('{{', '|', '}}'):
+        field.append(tokens[index])
+        index -= 1
+    if index >= 0 and tokens[index] == '|' and field:
+        field.reverse()
+        return tuple(field)
+    return None
+
+
+def _link_option_after(tokens, start):
+    option, _ = _tokens_until(tokens, start, ('|', ']]'))
+    return option
+
+
+def _pop_construct(stack, construct_type):
+    for stack_index in range(len(stack) - 1, -1, -1):
+        if stack[stack_index]['type'] == construct_type:
+            frame = stack[stack_index]
+            del stack[stack_index:]
+            return frame
+    return None
+
+
+# Normal tokens still match by value. Low-information wikitext tokens match by local syntax context so, for example, a link option "|" does not match an infobox field "|" and a "{{cite web}}" opener does not match "{{for-multi}}".
+def _word_match_keys(tokens):
+    keys = list(tokens)
+    stack = []
+    for index, token in enumerate(tokens):
+        if token == '{{':
+            name = _template_name_after(tokens, index + 1)
+            keys[index] = ('wikitext', '{{', 'template', name) if name else token
+            stack.append({'type': 'template', 'name': name, 'arg_index': 0})
+        elif token == '}}':
+            frame = _pop_construct(stack, 'template')
+            name = frame['name'] if frame else None
+            keys[index] = ('wikitext', '}}', 'template', name) if name else token
+        elif token == '[[':
+            target = _link_target_after(tokens, index + 1)
+            keys[index] = ('wikitext', '[[', 'link', target) if target else token
+            stack.append({'type': 'link', 'target': target, 'option_index': 0})
+        elif token == ']]':
+            frame = _pop_construct(stack, 'link')
+            target = frame['target'] if frame else None
+            keys[index] = ('wikitext', ']]', 'link', target) if target else token
+        elif token == '<!--':
+            keys[index] = ('wikitext', '<!--', 'comment')
+            stack.append({'type': 'comment'})
+        elif token == '-->':
+            _pop_construct(stack, 'comment')
+            keys[index] = ('wikitext', '-->', 'comment')
+        elif token == '|' and stack:
+            frame = stack[-1]
+            if frame['type'] == 'link':
+                option = _link_option_after(tokens, index + 1)
+                keys[index] = ('wikitext', '|', 'link', frame['target'],
+                               frame['option_index'], option)
+                frame['option_index'] += 1
+            elif frame['type'] == 'template':
+                field = _template_field_after(tokens, index + 1)
+                if field:
+                    keys[index] = ('wikitext', '|', 'template-field',
+                                   frame['name'], field)
+                else:
+                    keys[index] = ('wikitext', '|', 'template-arg',
+                                   frame['name'], frame['arg_index'])
+                frame['arg_index'] += 1
+        elif token == '=' and stack and stack[-1]['type'] == 'template':
+            field = _template_field_before(tokens, index)
+            if field:
+                keys[index] = ('wikitext', '=', 'template-field',
+                               stack[-1]['name'], field)
+    return keys
 
 
 def _word_match_drift_limit(prev_len, curr_len):
@@ -205,8 +308,13 @@ def _nearest_word_matches(prev_tokens, curr_tokens, prev_offset, curr_offset, ma
 def _match_word_sequences(text_prev, text_curr):
     prev_for_curr = [None] * len(text_curr)
 
-    prefix_len = _common_prefix_len(text_prev, text_curr)
-    prefix_len, suffix_len = _rollback_common_construct_edges(text_prev, text_curr, prefix_len)
+    prev_keys = _word_match_keys(text_prev)
+    curr_keys = _word_match_keys(text_curr)
+
+    prefix_len = _common_prefix_len(prev_keys, curr_keys)
+    prefix_len, suffix_len = _rollback_common_construct_edges(text_prev, text_curr,
+                                                              prev_keys, curr_keys,
+                                                              prefix_len)
     for index in range(prefix_len):
         prev_for_curr[index] = index
     for index in range(suffix_len):
@@ -220,25 +328,27 @@ def _match_word_sequences(text_prev, text_curr):
     curr_mid_end = len(text_curr) - suffix_len
     prev_mid = text_prev[prev_mid_start:prev_mid_end]
     curr_mid = text_curr[curr_mid_start:curr_mid_end]
+    prev_mid_keys = prev_keys[prev_mid_start:prev_mid_end]
+    curr_mid_keys = curr_keys[curr_mid_start:curr_mid_end]
 
     if prev_mid and curr_mid:
         max_drift = _word_match_drift_limit(len(prev_mid), len(curr_mid))
-        if _word_match_pair_estimate(prev_mid, curr_mid) <= WORD_MATCH_MAX_SEQUENCE_PAIRS:
-            matcher = SequenceMatcher(None, prev_mid, curr_mid, autojunk=False)
+        if _word_match_pair_estimate(prev_mid_keys, curr_mid_keys) <= WORD_MATCH_MAX_SEQUENCE_PAIRS:
+            matcher = SequenceMatcher(None, prev_mid_keys, curr_mid_keys, autojunk=False)
             for tag, i1, i2, j1, j2 in matcher.get_opcodes():
                 if tag == 'equal':
                     for prev_index, curr_index in zip(range(i1, i2), range(j1, j2)):
                         prev_for_curr[curr_mid_start + curr_index] = prev_mid_start + prev_index
                 elif tag == 'replace' and (i2 - i1) * (j2 - j1) <= WORD_MATCH_MAX_LOCAL_PAIRS:
-                    local_matches = _nearest_word_matches(prev_mid[i1:i2],
-                                                          curr_mid[j1:j2],
+                    local_matches = _nearest_word_matches(prev_mid_keys[i1:i2],
+                                                          curr_mid_keys[j1:j2],
                                                           prev_mid_start + i1,
                                                           curr_mid_start + j1,
                                                           max_drift)
                     for curr_index, prev_index in local_matches.items():
                         prev_for_curr[curr_mid_start + j1 + curr_index] = prev_mid_start + i1 + prev_index
         else:
-            local_matches = _nearest_word_matches(prev_mid, curr_mid,
+            local_matches = _nearest_word_matches(prev_mid_keys, curr_mid_keys,
                                                   prev_mid_start, curr_mid_start,
                                                   max_drift)
             for curr_index, prev_index in local_matches.items():
