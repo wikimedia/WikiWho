@@ -1,0 +1,297 @@
+[
+  {
+    "title": "Adam Himebauch",
+    "fixture": "fixtures/adam_himebauch_revisions.json",
+    "history_through_revid": 1316823741,
+    "snapshot_revid": 1316823741,
+    "cases": [
+      {
+        "id": "beginning_in_2022",
+        "context": "Beginning in 2022, Himebauch began working under his actual name.",
+        "focus": ["Beginning in 2022"],
+        "expected": {
+          "values": ["beginning", "in", "2022"],
+          "origin_rev_ids": [1082167926, 1082167926, 1082167926],
+          "last_rev_ids": [1316823741, 1316823741, 1316823741]
+        }
+      },
+      {
+        "id": "first_hanksy",
+        "context": "pseudonym '''Hanksy'''.<ref",
+        "focus": ["Hanksy"],
+        "expected": {
+          "values": ["hanksy"],
+          "origin_rev_ids": [1315073789],
+          "last_rev_ids": [1316823741]
+        }
+      },
+      {
+        "id": "first_nyt_title_a",
+        "context": "|title=A Parodist Who Calls Himself Hanksy |url=https://www.nytimes.com/2014/02/16/nyregion/a-parodist-who-calls-himself-hanksy.html |access-date=2016-12-14 |newspaper=The New York Times",
+        "focus": [{"text": "A", "occurrence": 1}],
+        "expected": {
+          "values": ["a"],
+          "origin_rev_ids": [1316823741],
+          "last_rev_ids": [1316823741]
+        }
+      },
+      {
+        "id": "first_nyt_url_https",
+        "context": "|title=A Parodist Who Calls Himself Hanksy |url=https://www.nytimes.com/2014/02/16/nyregion/a-parodist-who-calls-himself-hanksy.html |access-date=2016-12-14 |newspaper=The New York Times",
+        "focus": ["https"],
+        "expected": {
+          "values": ["https"],
+          "origin_rev_ids": [767656880],
+          "last_rev_ids": [1316823741]
+        }
+      },
+      {
+        "id": "first_nyt_url_rest",
+        "context": "|title=A Parodist Who Calls Himself Hanksy |url=https://www.nytimes.com/2014/02/16/nyregion/a-parodist-who-calls-himself-hanksy.html |access-date=2016-12-14 |newspaper=The New York Times",
+        "focus": ["://www.nytimes.com/2014/02/16/nyregion/a-parodist-who-calls-himself-hanksy.html"],
+        "expected": {
+          "values": [":", "/", "/", "www", ".", "nytimes", ".", "com", "/", "2014", "/", "02", "/", "16", "/", "nyregion", "/", "a", "-", "parodist", "-", "who", "-", "calls", "-", "himself", "-", "hanksy", ".", "html"],
+          "origin_rev_ids": [678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561, 678458561],
+          "last_rev_ids": [1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741]
+        }
+      },
+      {
+        "id": "the_image_went_viral",
+        "context": "The image went viral",
+        "focus": [{"text": "The", "occurrence": 1}],
+        "expected": {
+          "values": ["the"],
+          "origin_rev_ids": [754869525],
+          "last_rev_ids": [1316823741]
+        }
+      },
+      {
+        "id": "reverend_jen_title",
+        "context": "|title=Reverend Jen exclusive on Hanksy, the Tom Hanks-Banksy mashup artist - artnet Magazine |url=http://www.artnet.com/magazineus/features/jen/reverend-jen-hanksy-art-show-1-17-12.asp",
+        "focus": ["Reverend Jen exclusive on Hanksy"],
+        "expected": {
+          "values": ["reverend", "jen", "exclusive", "on", "hanksy"],
+          "origin_rev_ids": [754869525, 754869525, 754869525, 754869525, 754869525],
+          "last_rev_ids": [1316823741, 1316823741, 1316823741, 1316823741, 1316823741]
+        }
+      },
+      {
+        "id": "between_2011_and_2017",
+        "context": "Between 2011 and 2017, Hanksy created hundreds of images of visual wordplay and celebrity that he pasted on the streets, and painted on canvases that were exhibited across the country.",
+        "focus": ["Between 2011 and 2017"],
+        "expected": {
+          "values": ["between", "2011", "and", "2017"],
+          "origin_rev_ids": [1162525604, 754869525, 1162525604, 1162559322],
+          "last_rev_ids": [1316823741, 1316823741, 1316823741, 1316823741]
+        }
+      },
+      {
+        "id": "created_and_images",
+        "context": "Between 2011 and 2017, Hanksy created hundreds of images of visual wordplay and celebrity that he pasted on the streets, and painted on canvases that were exhibited across the country.",
+        "focus": ["created", "images"],
+        "expected": {
+          "values": ["created", "images"],
+          "origin_rev_ids": [754869525, 754869525],
+          "last_rev_ids": [1316823741, 1316823741]
+        }
+      },
+      {
+        "id": "exhibited_across_country",
+        "context": "Between 2011 and 2017, Hanksy created hundreds of images of visual wordplay and celebrity that he pasted on the streets, and painted on canvases that were exhibited across the country.",
+        "focus": ["exhibited across the country"],
+        "expected": {
+          "values": ["exhibited", "across", "the", "country"],
+          "origin_rev_ids": [754869525, 754869525, 754869525, 754869525],
+          "last_rev_ids": [1316823741, 1316823741, 1316823741, 1316823741]
+        }
+      },
+      {
+        "id": "second_nyt_title",
+        "context": "|title=A Parodist Who Calls Himself Hanksy |newspaper=[[The New York Times]] |url=https://www.nytimes.com/2014/02/16/nyregion/a-parodist-who-calls-himself-hanksy.html |access-date=2015-08-29",
+        "focus": ["A Parodist Who Calls Himself Hanksy"],
+        "expected": {
+          "values": ["a", "parodist", "who", "calls", "himself", "hanksy"],
+          "origin_rev_ids": [1078016622, 1078016622, 1078016622, 1078016622, 1078016622, 1078016622],
+          "last_rev_ids": [1316823741, 1316823741, 1316823741, 1316823741, 1316823741, 1316823741]
+        }
+      }
+    ]
+  },
+  {
+    "title": "Japan Cup",
+    "fixture": "fixtures/japan_cup_revisions.json",
+    "history_through_revid": 524409649,
+    "cases": [
+      {
+        "id": "japan_cup_over_distance_rewrite",
+        "snapshot_revid": 24011298,
+        "token_index": 3,
+        "expected": {
+          "values": ["over"],
+          "origin_rev_ids": [24011298],
+          "last_rev_ids": [112007899],
+          "inbound": [[]],
+          "outbound": [[112010328]]
+        }
+      }
+    ]
+  },
+  {
+    "title": "Splatoon 3",
+    "fixture": "fixtures/splatoon_3_revisions.json",
+    "history_through_revid": 1007397695,
+    "snapshot_revid": 1007397695,
+    "cases": [
+      {
+        "id": "splatoon_title_lead_not_infobox",
+        "context": "'''''Splatoon 3''''' is an upcoming",
+        "focus": ["Splatoon 3"],
+        "expected": {
+          "values": ["splatoon", "3"],
+          "origin_rev_ids": [1007397055, 1007397055]
+        }
+      },
+      {
+        "id": "splatoon_category_reused_broad_category_tokens",
+        "context": "[[Category:Video games developed in Japan]]",
+        "focus": ["[[Category:Video games developed in Japan]]"],
+        "expected": {
+          "values": ["[[", "category", ":", "video", "games", "developed", "in", "japan", "]]"],
+          "origin_rev_ids": [1007397440, 1007397440, 1007397440, 1007397440, 1007397440, 1007397695, 1007397695, 1007397695, 1007397440]
+        }
+      }
+    ]
+  },
+  {
+    "title": "2026 Canvas security incident",
+    "fixture": "fixtures/2026_canvas_security_incident_revisions.json",
+    "history_through_revid": 1354204849,
+    "cases": [
+      {
+        "id": "canvas_short_description_closer_stays_continuous",
+        "snapshot_revid": 1353079526,
+        "token_index": 10,
+        "expected": {
+          "values": ["}}"],
+          "origin_rev_ids": [1353079526],
+          "last_rev_ids": [1354204849],
+          "inbound": [[]],
+          "outbound": [[]]
+        }
+      }
+    ]
+  },
+  {
+    "title": "2026 Canvas security incident",
+    "fixture": "fixtures/2026_canvas_security_incident_revisions.json",
+    "history_through_revid": 1353090711,
+    "cases": [
+      {
+        "id": "canvas_adjacent_duplicate_said",
+        "snapshot_revid": 1353079526,
+        "context": "Instructure said said the information involved in the incident appeared to include certain iidentifying information",
+        "focus": ["said said"],
+        "expected": {
+          "values": ["said", "said"],
+          "origin_rev_ids": [1353079526, 1353079526],
+          "last_rev_ids": [1353090711, 1353090491],
+          "outbound": [[], [1353090711]]
+        }
+      }
+    ]
+  },
+  {
+    "title": "American goldfinch",
+    "fixture": "fixtures/american_goldfinch_revisions.json",
+    "history_through_revid": 122044470,
+    "cases": [
+      {
+        "id": "goldfinch_period_removed_with_length_phrase",
+        "snapshot_revid": 24921,
+        "token_index": 43,
+        "expected": {
+          "values": ["."],
+          "origin_rev_ids": [24921],
+          "last_rev_ids": [122039732],
+          "inbound": [[]],
+          "outbound": [[122044470]]
+        }
+      }
+    ]
+  },
+  {
+    "title": "American goldfinch",
+    "fixture": "fixtures/american_goldfinch_revisions.json",
+    "history_through_revid": 37287458,
+    "cases": [
+      {
+        "id": "goldfinch_image_opener_preserved_while_target_same",
+        "snapshot_revid": 15936180,
+        "context": "[[Image:American_Goldfinch_(small_illustration).jpg|240px]]",
+        "focus": ["[["],
+        "expected": {
+          "values": ["[["],
+          "origin_rev_ids": [859274]
+        }
+      },
+      {
+        "id": "goldfinch_image_opener_resets_after_target_change",
+        "snapshot_revid": 18645783,
+        "context": "[[Image:AmericanGoldfinch23.jpg]]",
+        "focus": ["[["],
+        "expected": {
+          "values": ["[["],
+          "origin_rev_ids": [18645783]
+        }
+      },
+      {
+        "id": "goldfinch_taxobox_opener_resets_on_template_conversion",
+        "snapshot_revid": 37287458,
+        "context": "{{Taxobox\n| color = pink",
+        "focus": ["{{"],
+        "expected": {
+          "values": ["{{"],
+          "origin_rev_ids": [37287458]
+        }
+      }
+    ]
+  },
+  {
+    "title": "Nintendo Switch",
+    "fixture": "fixtures/nintendo_switch_revisions.json",
+    "history_through_revid": 651993021,
+    "cases": [
+      {
+        "id": "nintendo_comment_apostrophe_not_title_markup",
+        "snapshot_revid": 651807915,
+        "token_index": 3,
+        "expected": {
+          "values": ["'"],
+          "origin_rev_ids": [651807915],
+          "last_rev_ids": [651992792],
+          "inbound": [[651992792]],
+          "outbound": [[651930777, 651993021]]
+        }
+      }
+    ]
+  },
+  {
+    "title": "Through the Looking-Glass",
+    "fixture": "fixtures/through_the_looking-glass_revisions.json",
+    "history_through_revid": 1273903188,
+    "cases": [
+      {
+        "id": "looking_glass_stub_to_not_final_lead_to",
+        "snapshot_revid": 291417,
+        "token_index": 1,
+        "expected": {
+          "values": ["to"],
+          "origin_rev_ids": [291417],
+          "last_rev_ids": [1268074738],
+          "inbound": [[]],
+          "outbound": [[1273903188]]
+        }
+      }
+    ]
+  }
+]
